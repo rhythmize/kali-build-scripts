@@ -22,7 +22,7 @@ cp /usr/bin/qemu-arm-static ${fs_dir}/usr/bin/
 echo "Running debootstrap second stage ..."
 systemd-nspawn -M ${machine} -D ${fs_dir}/ /debootstrap/debootstrap --second-stage
 
-# install required packages
+# configure target filesystem
 cp config_target.sh ${fs_dir}/
 
 # use host system resolv.conf for dns resolution
@@ -55,6 +55,24 @@ cat << EOF > ${fs_dir}/etc/resolv.conf
 nameserver 8.8.8.8
 EOF
 
+# Build linux-kernel
+echo "Building Linux kernel ..."
+cd ${kernel_dir}
+make ARCH=arm sunxi_defconfig
+make -j $(grep -c processor /proc/cpuinfo) ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- zImage
+make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- dtbs
+make -j $(grep -c processor /proc/cpuinfo) ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- modules
+# install kernel modules
+echo "Installing kernel modules ..."
+make -j $(grep -c processor /proc/cpuinfo) ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- INSTALL_MOD_PATH=${basedir}/${fs_dir}/ modules_install
+# copy kernel image and device tree
+
+echo "Copying kernel image and device tree ..."
+cp arch/arm/boot/zImage ${basedir}/${fs_dir}/boot/
+cp arch/arm/boot/dts/sun8i-h2-plus-libretech-all-h3-cc.dtb ${basedir}/${fs_dir}/boot/device_tree.dtb
+# clear repository
+make mrproper
+cd ${basedir}
 
 # create image file
 echo "Creating image file ..."
@@ -79,6 +97,32 @@ partprobe ${loop_device}
 # create filesystem
 mkfs.ext4 ${loop_device}p1
 
+# Build u-boot
+echo "Building U-Boot bootloader ..."
+cd ${uboot_dir}
+make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- libretech_all_h3_cc_h2_plus_defconfig
+# PATCH: needed to do it for my board for u-boot to read kernel and device-tree 
+sed -i 's/CONFIG_ENV_FAT_DEVICE_AND_PART=.*/CONFIG_ENV_FAT_DEVICE_AND_PART="0:auto"/g' .config
+make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf-
+
+# create boot.cmd file
+cat << 'EOF' > ${basedir}/${fs_dir}/boot/boot.cmd
+setenv bootargs console=ttyS0,115200 root=/dev/mmcblk0p1 rootwait panic=10 rw rootfstype=ext4 net.ifnames=0
+load mmc 0:1 $kernel_addr_r /boot/zImage
+load mmc 0:1 $fdt_addr_r /boot/device_tree.dtb
+bootz $kernel_addr_r - $fdt_addr_r
+EOF
+
+# Create u-boot boot script image
+echo "Creating u-boot boot script ..."
+mkimage -A arm -T script -C none -d ${basedir}/${fs_dir}/boot/boot.cmd ${basedir}/${fs_dir}/boot/boot.scr
+
+# flash u-boot
+echo "Flashing u-boot ..."
+dd if=u-boot-sunxi-with-spl.bin of=${loop_device} bs=1024 seek=8 status=progress
+# clear repository
+make mrproper
+cd ${basedir}
 
 # mount loop-device 
 mount -o loop ${loop_device}p1 /mnt
