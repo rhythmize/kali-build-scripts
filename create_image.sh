@@ -1,3 +1,9 @@
+/*
+ * create_image.sh
+ * 
+ * Created on: 30-Sep-2018
+ *     Author: rhythm
+ */
 #!/bin/bash
 
 if [ $EUID -ne 0 ];then
@@ -104,13 +110,24 @@ partprobe ${loop_device}
 # create filesystem
 mkfs.ext4 ${loop_device}p1
 
-# Build u-boot
-echo "Building U-Boot bootloader ..."
-cd ${uboot_dir}
-make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- libretech_all_h3_cc_h2_plus_defconfig
-# PATCH: needed to do it for my board for u-boot to read kernel and device-tree 
-sed -i 's/CONFIG_ENV_FAT_DEVICE_AND_PART=.*/CONFIG_ENV_FAT_DEVICE_AND_PART="0:auto"/g' .config
-make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf-
+# Build u-boot, if u-boot directory exists
+if [ -d u-boot ]; then
+	echo "Building U-Boot bootloader ..."
+	cd ${uboot_dir}
+	make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- libretech_all_h3_cc_h2_plus_defconfig
+	# PATCH: needed to do it for my board for u-boot to read kernel and device-tree 
+	sed -i 's/CONFIG_ENV_FAT_DEVICE_AND_PART=.*/CONFIG_ENV_FAT_DEVICE_AND_PART="0:auto"/g' .config
+	make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf-
+
+	echo "Flashing currently build u-boot ..."
+	dd if=u-boot-sunxi-with-spl.bin of=${loop_device} bs=1024 seek=8 status=progress
+	# clear repository
+	make mrproper
+	cd ${basedir}
+else
+	echo "Flashing u-boot from archive ..."
+	dd if=archive/u-boot/u-boot-sunxi-with-spl.bin of=${loop_device} bs=1024 seek=8 status=progress
+fi
 
 # create boot.cmd file
 cat << 'EOF' > ${basedir}/${fs_dir}/boot/boot.cmd
@@ -123,13 +140,6 @@ EOF
 # Create u-boot boot script image
 echo "Creating u-boot boot script ..."
 mkimage -A arm -T script -C none -d ${basedir}/${fs_dir}/boot/boot.cmd ${basedir}/${fs_dir}/boot/boot.scr
-
-# flash u-boot
-echo "Flashing u-boot ..."
-dd if=u-boot-sunxi-with-spl.bin of=${loop_device} bs=1024 seek=8 status=progress
-# clear repository
-make mrproper
-cd ${basedir}
 
 # mount loop-device 
 mount -o loop ${loop_device}p1 /mnt
