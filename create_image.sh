@@ -1,9 +1,3 @@
-/*
- * create_image.sh
- * 
- * Created on: 30-Sep-2018
- *     Author: rhythm
- */
 #!/bin/bash
 
 if [ $EUID -ne 0 ];then
@@ -15,6 +9,7 @@ hostname="kali-rolling"
 fs_dir="kali-fs"
 uboot_dir="u-boot"
 kernel_dir="linux"
+firmware_dir="linux-firmware"
 mirror="http://http.kali.org/kali"
 basedir=$(pwd)
 machine=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 16 | head -n 1)
@@ -69,23 +64,37 @@ nameserver 8.8.8.8
 EOF
 
 # Build linux-kernel
-echo "Building Linux kernel ..."
-cd ${kernel_dir}
-make ARCH=arm sunxi_defconfig
-make -j $(grep -c processor /proc/cpuinfo) ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- zImage
-make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- dtbs
-make -j $(grep -c processor /proc/cpuinfo) ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- modules
-# install kernel modules
-echo "Installing kernel modules ..."
-make -j $(grep -c processor /proc/cpuinfo) ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- INSTALL_MOD_PATH=${basedir}/${fs_dir}/ modules_install
+if [ -d ${kernel_dir} ]; then
+	echo "Building Linux kernel ..."
+	cd ${kernel_dir}
+	make ARCH=arm sunxi_defconfig
+	# copy kernel config file from archive
+	cp ../archive/kernel/config/linux_4.18_config .config
+	make -j $(grep -c processor /proc/cpuinfo) ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- zImage
+	make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- dtbs
+	make -j $(grep -c processor /proc/cpuinfo) ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- modules
+	# install kernel modules
+	echo "Installing currently build kernel and modules ..."
+	make -j $(grep -c processor /proc/cpuinfo) ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- INSTALL_MOD_PATH=${basedir}/${fs_dir}/ modules_install
 
-# copy kernel image and device tree
-echo "Copying kernel image and device tree ..."
-cp arch/arm/boot/zImage ${basedir}/${fs_dir}/boot/
-cp arch/arm/boot/dts/sun8i-h2-plus-libretech-all-h3-cc.dtb ${basedir}/${fs_dir}/boot/device_tree.dtb
-# clear repository
-make mrproper
-cd ${basedir}
+	# copy kernel image and device tree
+	cp arch/arm/boot/zImage ${basedir}/${fs_dir}/boot/
+	cp arch/arm/boot/dts/sun8i-h2-plus-libretech-all-h3-cc.dtb ${basedir}/${fs_dir}/boot/device_tree.dtb
+	# clear repository
+	make mrproper
+	cd ${basedir}
+else
+	echo "Installing kernel and modules from archive ..."
+	cp -r archive/kernel/lib/modules/ ${fs_dir}/lib/
+	# copy kernel image and device tree from archive
+	cp archive/kernel/boot/zImage ${fs_dir}/boot/
+	cp archive/kernel/boot/device_tree.dtb ${fs_dir}/boot/
+fi
+
+if [ -d ${firmware_dir} ]; then
+	echo "Copying RTL wifi firmware ..."
+	cp -r ${firmware_dir}/rtlwifi/ ${fs_dir}/lib/firmware/
+fi
 
 # create image file
 echo "Creating image file ..."
@@ -111,7 +120,7 @@ partprobe ${loop_device}
 mkfs.ext4 ${loop_device}p1
 
 # Build u-boot, if u-boot directory exists
-if [ -d u-boot ]; then
+if [ -d ${uboot_dir} ]; then
 	echo "Building U-Boot bootloader ..."
 	cd ${uboot_dir}
 	make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- libretech_all_h3_cc_h2_plus_defconfig

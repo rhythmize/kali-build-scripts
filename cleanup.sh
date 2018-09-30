@@ -7,7 +7,7 @@ fi
 
 set -eu pipefail
 
-# echo "Removing kali sources from sources.list"
+echo "Removing kali sources from sources.list"
 sudo sed -i '$d' /etc/apt/sources.list
 sudo sed -i '$d' /etc/apt/sources.list
 echo "Removing kali keyring ..."
@@ -20,6 +20,10 @@ apt -y autoclean
 # clear kernel directory
 echo "Cleaning kernel directory"
 rm -rf linux
+
+# clear linux firmware directory
+echo "Cleaning linux firmware directory"
+rm -rf linux-firmware
 
 # clear bootloader directory
 echo "Cleaning u-boot directory"
