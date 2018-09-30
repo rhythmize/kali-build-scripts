@@ -9,7 +9,7 @@ hostname="kali-rolling"
 fs_dir="kali-fs"
 uboot_dir="u-boot"
 kernel_dir="linux"
-mirror="https://http.kali.org/kali"
+mirror="http://http.kali.org/kali"
 basedir=$(pwd)
 machine=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 16 | head -n 1)
 
@@ -18,15 +18,16 @@ set -eu pipefail
 # create filesystem
 echo "Running debootstrap ..."
 debootstrap --foreign --keyring=/usr/share/keyrings/kali-archive-keyring.gpg --include=kali-archive-keyring --arch armhf kali-rolling ${fs_dir} ${mirror}
+
 cp /usr/bin/qemu-arm-static ${fs_dir}/usr/bin/
 echo "Running debootstrap second stage ..."
-systemd-nspawn -M ${machine} -D ${fs_dir}/ /debootstrap/debootstrap --second-stage
+LANG=C systemd-nspawn -M ${machine} -D ${fs_dir}/ /debootstrap/debootstrap --second-stage
 
 # configure target filesystem
 cp config_target.sh ${fs_dir}/
 
 # use host system resolv.conf for dns resolution
-systemd-nspawn -M ${machine} --bind /etc/resolv.conf:/etc/resolv.conf -D ${fs_dir}/ /config_target.sh
+LANG=C systemd-nspawn -M ${machine} --bind /etc/resolv.conf:/etc/resolv.conf -D ${fs_dir}/ /config_target.sh
 rm ${fs_dir}/config_target.sh
 
 # Update hostname
@@ -47,6 +48,12 @@ iface lo inet loopback
 allow-hotplug eth0
 no-auto-down eth0
 iface eth0 inet dhcp
+
+# Wireless adapter #1
+# for in-built adapter change `allow-hotplug` to `auto`
+allow-hotplug wlan0
+iface wlan0 inet dhcp
+pre-up wpa_supplicant -Dwext -i wlan0 -c /etc/wpa_supplicant.conf -B
 EOF
 
 # Update nameserver
@@ -65,8 +72,8 @@ make -j $(grep -c processor /proc/cpuinfo) ARCH=arm CROSS_COMPILE=arm-linux-gnue
 # install kernel modules
 echo "Installing kernel modules ..."
 make -j $(grep -c processor /proc/cpuinfo) ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- INSTALL_MOD_PATH=${basedir}/${fs_dir}/ modules_install
-# copy kernel image and device tree
 
+# copy kernel image and device tree
 echo "Copying kernel image and device tree ..."
 cp arch/arm/boot/zImage ${basedir}/${fs_dir}/boot/
 cp arch/arm/boot/dts/sun8i-h2-plus-libretech-all-h3-cc.dtb ${basedir}/${fs_dir}/boot/device_tree.dtb

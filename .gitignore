@@ -1,0 +1,6 @@
+# image file
+*.img
+
+# all directories, apart from archive
+*/**
+!archive/**
