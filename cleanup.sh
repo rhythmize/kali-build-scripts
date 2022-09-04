@@ -5,7 +5,7 @@ if [ $EUID -ne 0 ];then
 	exit 1
 fi
 
-set -eu pipefail
+set -euo pipefail
 
 if grep -q "deb http://http.kali.org/kali kali-rolling main non-free contrib" "/etc/apt/sources.list"; then
 	echo "Removing kali sources from sources.list"

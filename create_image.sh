@@ -6,7 +6,7 @@ if [ $EUID -ne 0 ];then
 fi
 
 hostname="kali-rolling"
-fs_dir="kali-fs"
+fs_dir="/tmp/kali-fs-`date +'%Y_%m_%d_%H_%M_%S'`"
 uboot_dir="u-boot"
 kernel_dir="linux"
 firmware_dir="linux-firmware"
@@ -14,18 +14,20 @@ mirror="http://http.kali.org/kali"
 basedir=$(pwd)
 machine=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 16 | head -n 1)
 
-set -eu pipefail
+set -euo pipefail
 
 # create filesystem
-echo "Running debootstrap ..."
+echo "[+] Running debootstrap first stage ..."
 debootstrap --foreign --keyring=/usr/share/keyrings/kali-archive-keyring.gpg --include=kali-archive-keyring --arch armhf kali-rolling ${fs_dir} ${mirror}
+echo "[+] Debootstrap first stage finished successfully"
 
 cp /usr/bin/qemu-arm-static ${fs_dir}/usr/bin/
-echo "Running debootstrap second stage ..."
+echo "[+] Running debootstrap second stage ..."
 LANG=C systemd-nspawn -M ${machine} -D ${fs_dir}/ /debootstrap/debootstrap --second-stage
+echo "[+] Debootstrap second stage finished successfully"
 
 # configure target filesystem
-cp config_target.sh ${fs_dir}/
+cp utils/config_target.sh ${fs_dir}/
 
 # use host system resolv.conf for dns resolution
 LANG=C systemd-nspawn -M ${machine} --bind /etc/resolv.conf:/etc/resolv.conf -D ${fs_dir}/ /config_target.sh
@@ -159,5 +161,6 @@ rsync -HPavz -q ${basedir}/${fs_dir}/ /mnt
 umount /mnt
 # desociate loop-device from image file
 losetup -d ${loop_device}
+
 
 echo "Image successfully saved in ${hostname}.img"
