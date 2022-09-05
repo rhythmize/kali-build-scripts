@@ -16,7 +16,7 @@ Building image file
 
 Writing image to sdcard
 -----------------------
-1. sudo dd if=kali-rolling.img of=/dev/sdb status=progress
+1. sudo dd if=images/kali-rolling.img of=/dev/sdb status=progress
     > Change device name(i.e. of=</dev/sdx>) and image filename(i.e. if=<file.img>) accordingly.
 
 

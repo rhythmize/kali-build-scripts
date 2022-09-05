@@ -1,7 +1,1 @@
-# ignore image file created
-*.img
-
-# ignore all directories, apart from archive
-*/
-!/archive/
-!/archive/**
+images/
