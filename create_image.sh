@@ -83,7 +83,7 @@ if [ -d ${kernel_dir} ]; then
 	cd ${kernel_dir}
 	make ARCH=arm sunxi_defconfig
 	# copy kernel config file from archive
-	cp ../archive/kernel/config/linux_4.18_config .config
+	cp ../archive/kernel/config/linux_5.18_config .config
 	make -j $(grep -c processor /proc/cpuinfo) ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- zImage
 	make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- dtbs
 	make -j $(grep -c processor /proc/cpuinfo) ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- modules

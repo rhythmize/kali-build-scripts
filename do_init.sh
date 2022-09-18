@@ -1,7 +1,6 @@
 #!/bin/bash
 
 with_linux_kernel_sources=false
-with_linux_firmware_sources=false
 with_uboot_sources=false
 
 BOLD=$(tput bold)
@@ -54,11 +53,9 @@ Init() {
 		git clone git://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git -b linux-4.18.y linux
 	fi
 
-	if $with_linux_firmware_sources; then
-		# You can change if you want to use customized kernel firmware
-		echo -e "${RED}${BOLD}[+] Cloning linux kernel firmware ...${NORMAL}${NC}"
-		git clone git://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git linux-firmware
-	fi
+	# You can change if you want to use customized kernel firmware
+	echo -e "${RED}${BOLD}[+] Cloning linux kernel firmware (for rtlwifi)...${NORMAL}${NC}"
+	git clone git://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git linux-firmware
 
 	if $with_uboot_sources; then
 		# You can change here if you want some customized bootloader
@@ -75,9 +72,6 @@ for arg in "$@"; do
 		exit;;
     '--with-linux-kernel-sources')
 		with_linux_kernel_sources=true
-		;;
-    '--with-linux-firmware-sources')
-		with_linux_firmware_sources=true
 		;;
     '--with-uboot-sources')
 		with_uboot_sources=true
